@@ -39,7 +39,8 @@ every prompt default from it. Host and project come from `origin`.
   unmarked prompt for an explanation.
 
 At any prompt, Enter keeps the default and `-` clears it. The description and the explanation
-take multiple lines; Tab focuses `[ submit ]`.
+take multiple lines; Tab focuses `[ submit ]`. A title that starts with `WIP:` or `Draft:` opens
+the MR as a draft.
 
 GitLab drops a bad username or milestone without an error and `git push` still exits 0, so a
 clean run is not proof the MR is right. `mr` fails the run if the server sends back `WARNINGS`,
