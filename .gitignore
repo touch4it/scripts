@@ -1,0 +1,12 @@
+# Node
+/node_modules
+npm-debug.log
+
+# Build output (generated on publish)
+/dist
+
+# Test output
+/coverage
+
+# IDE
+.idea/
