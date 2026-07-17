@@ -29,6 +29,12 @@ export default defineConfig([
       // This is a CLI: a non-zero exit is how it reports failure.
       'n/no-process-exit': 'off',
       'unicorn/no-process-exit': 'off',
+      // Package.json's bin names the built path, so resolve src against it.
+      'n/hashbang': ['error', {
+        convertPath: {
+          'src/**/*.ts': ['^src/(.+)\\.ts$', 'dist/$1.js'],
+        },
+      }],
     },
   },
   {

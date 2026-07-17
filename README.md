@@ -3,10 +3,23 @@
 Repository scripts. One command: `mr` — opens a GitLab merge request from your repo's own MR
 template, over git push options. No API token, no editor setup.
 
+## Setup
+
+Add the script to the repo you open MRs from. Nothing to install — `npx` fetches the package:
+
+```json
+"scripts": {
+  "mr": "npx @touch4it/scripts mr"
+}
+```
+
 ```bash
 npm run mr                 # open the MR
 npm run mr -- --dry-run    # fill it all in and print the push options, push nothing
 ```
+
+`npx` resolves the latest published version on every run. To pin one, add
+`@touch4it/scripts` to `devDependencies` and drop the `npx` prefix.
 
 **Run it instead of your first `git push` on the branch, not after.** GitLab only applies push
 options when the push moves a ref, so a branch that is already pushed and unchanged has nothing
