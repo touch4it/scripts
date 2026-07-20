@@ -1,4 +1,4 @@
-const TABLE_ROW = '| [ ] | [ ]';
+const TABLE_ROW = /^(?:\|\s*\[[ xX]]\s*){2}\|/;
 const LIST_ROW = '- [ ] ';
 const DESCRIPTION_PLACEHOLDER = '<Briefly describe';
 const EXPLANATION_PLACEHOLDER = '<If any of these';
@@ -50,14 +50,14 @@ export function reviewerValue(template: string): string {
 }
 
 /**
- * Task names of the template's unmarked checklist rows, in order. Handles both a
- * `| N/A | Done | Task |` table and a `- [ ] Task` list.
+ * Task names of the template's checklist rows, in order. Handles a two-checkbox
+ * table in either column order and a `- [ ] Task` list.
  */
 export function parseTasks(template: string): string[] {
   const tasks: string[] = [];
 
   for (const line of template.split('\n')) {
-    if (line.startsWith(TABLE_ROW)) {
+    if (TABLE_ROW.test(line)) {
       tasks.push(line.split('|')[3]?.trim() ?? '');
     } else if (line.startsWith(LIST_ROW)) {
       tasks.push(line.slice(LIST_ROW.length).trim());
@@ -65,6 +65,21 @@ export function parseTasks(template: string): string[] {
   }
 
   return tasks;
+}
+
+/** True when the checklist table lists its Done column before its N/A column. */
+function doneColumnFirst(template: string): boolean {
+  const header = template.split('\n').find(line => line.includes('Done') && line.includes('N/A'));
+  return header ? header.indexOf('Done') < header.indexOf('N/A') : false;
+}
+
+/** Mark a row's two checkboxes for its column order, leaving every space intact. */
+function markTableRow(line: string, done: boolean, doneFirst: boolean): string {
+  const doneBox = done ? '[x]' : '[ ]';
+  const naBox = done ? '[ ]' : '[x]';
+  const marks = doneFirst ? [doneBox, naBox] : [naBox, doneBox];
+  let index = 0;
+  return line.replace(/\[[ xX]]/g, box => marks[index++] ?? box);
 }
 
 /**
@@ -76,6 +91,7 @@ export function parseTasks(template: string): string[] {
 export function assembleBody(template: string, input: BodyInput): string {
   const {description, explanation = '', reviewer = '', done = []} = input;
   const out: string[] = [];
+  const doneFirst = doneColumnFirst(template);
   let row = 0;
   let reviewerSeen = false;
 
@@ -95,9 +111,8 @@ export function assembleBody(template: string, input: BodyInput): string {
       }
     } else if (action && PUSH_OPTION_ACTIONS.has(action)) {
       continue;
-    } else if (line.startsWith(TABLE_ROW)) {
-      // The table carries an explicit N/A column; anything not done is marked N/A.
-      out.push((done[row++] ? '| [ ] | [x]' : '| [x] | [ ]') + line.slice(TABLE_ROW.length));
+    } else if (TABLE_ROW.test(line)) {
+      out.push(markTableRow(line, Boolean(done[row++]), doneFirst));
     } else if (line.startsWith(LIST_ROW)) {
       // A list has no N/A column, so anything not done just stays unchecked.
       out.push((done[row++] ? '- [x] ' : '- [ ] ') + line.slice(LIST_ROW.length));

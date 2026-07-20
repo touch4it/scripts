@@ -17,12 +17,15 @@ const read = (name: string): string => readFileSync(
 
 // A `| N/A | Done | Task |` table, /reviewer, and a milestone.
 const table = read('Default.md');
+// A `| Done | N/A | Task |` table with the checkbox columns switched.
+const switched = read('Default2.md');
 // A `- [ ] Task` list, /assign_reviewer, and no milestone.
-const list = read('DefaultSimple.md');
+const list = read('Default3.md');
 
 const shapes = [
   {name: 'table (Default.md)', template: table, rows: 6},
-  {name: 'list (DefaultSimple.md)', template: list, rows: 6},
+  {name: 'switched table (Default2.md)', template: switched, rows: 10},
+  {name: 'list (Default3.md)', template: list, rows: 6},
 ];
 
 const contains = (haystack: string, needle: string): void => {
@@ -113,6 +116,21 @@ describe('parseTasks', () => {
       'Ran `npm test` locally',
       'Tested other related features',
       'Updated `AGENTS.md` and/or `docs/`',
+    ]);
+  });
+
+  it('reads the switched-column table checklist', () => {
+    assert.deepEqual(parseTasks(switched), [
+      'Added/Updated tests',
+      'Ran `npm run lint` locally for all affected systems',
+      'Ran `npm run test` locally for all affected systems',
+      'Tested other related features',
+      'Updated OpenAPI documentation',
+      'Updated AsyncAPI documentation in `resources/asyncapi/`',
+      'Updated documentation in `docs/`',
+      'Set milestone',
+      'Updated technical notes in Requirement',
+      'Notified data team if data structure is affected',
     ]);
   });
 
@@ -223,6 +241,31 @@ describe('assembleBody — table specifics', () => {
 
   it('keeps the /reviewer alias the template used', () => {
     contains(assembleBody(table, {...base, reviewer: 'jane.doe'}), '/reviewer @jane.doe');
+  });
+});
+
+describe('assembleBody — switched table specifics', () => {
+  const base = {
+    description: 'DESC',
+    done: [true, false, ...Array.from({length: 8}, () => false)],
+    reviewer: 'reviewer',
+  };
+
+  it('checks the Done column first, N/A second', () => {
+    const rows = assembleBody(switched, base).split('\n').filter(line => line.startsWith('| ['));
+    assert.ok(rows[0]?.startsWith('| [x]'), 'row 1 should tick the leading Done column');
+    contains(rows[0] ?? '', 'Added/Updated tests');
+    assert.ok(rows[1]?.startsWith('| [ ]  | [x]'), 'row 2 should tick the trailing N/A column');
+    contains(rows[1] ?? '', 'Ran `npm run lint`');
+  });
+
+  it('preserves the wider column alignment', () => {
+    const body = assembleBody(switched, {...base, done: Array.from({length: 10}, () => true)});
+    contains(body, '| [x]  | [ ] | Added/Updated tests');
+  });
+
+  it('keeps the /assign_reviewer alias the template used', () => {
+    contains(assembleBody(switched, {...base, reviewer: 'jane.doe'}), '/assign_reviewer @jane.doe');
   });
 });
 
