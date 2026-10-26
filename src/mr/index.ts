@@ -22,7 +22,15 @@ import {
 } from '../lib/prompts.ts';
 import {newMergeRequestUrl, parseRemote} from '../lib/remote.ts';
 import {
-  assembleBody, encodeDescription, parseTasks, reviewerValue, templateValue,
+  assembleBody,
+  encodeDescription,
+  hasSlot,
+  parseTasks,
+  parseTemplate,
+  reviewerValue,
+  TemplateError,
+  templateValue,
+  type Template,
 } from './template.ts';
 
 const TEMPLATE = '.gitlab/merge_request_templates/Default.md';
@@ -31,6 +39,18 @@ const PROTECTED = ['master', 'master-next', 'qa', 'staging', 'production'];
 export type MrOptions = {
   dryRun?: boolean;
 };
+
+function readTemplate(text: string): Template {
+  try {
+    return parseTemplate(text);
+  } catch (error) {
+    if (error instanceof TemplateError) {
+      bail(`${TEMPLATE}: ${error.message}`);
+    }
+
+    throw error;
+  }
+}
 
 export async function runMr({dryRun = false}: MrOptions = {}): Promise<void> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
@@ -52,9 +72,10 @@ export async function runMr({dryRun = false}: MrOptions = {}): Promise<void> {
     bail(`template not found: ${TEMPLATE}`);
   }
 
-  const template = readFileSync(TEMPLATE, 'utf8');
+  const text = readFileSync(TEMPLATE, 'utf8');
+  const template = readTemplate(text);
 
-  const target = templateValue(template, 'target_branch') || 'master';
+  const target = templateValue(text, 'target_branch') || 'master';
 
   const branch = currentBranch();
   if (!branch) {
@@ -118,13 +139,13 @@ export async function runMr({dryRun = false}: MrOptions = {}): Promise<void> {
     bail('empty description — aborted');
   }
 
-  const assignee = await ask('Assignee', templateValue(template, 'assign'));
-  const reviewer = await ask('Reviewer', reviewerValue(template));
-  const milestone = await ask('Milestone', templateValue(template, 'milestone'));
+  const assignee = await ask('Assignee', templateValue(text, 'assign'));
+  const reviewer = await ask('Reviewer', reviewerValue(text));
+  const milestone = await ask('Milestone', templateValue(text, 'milestone'));
 
   const tasks = parseTasks(template);
   if (tasks.length === 0) {
-    bail(`no checklist rows found in ${TEMPLATE}`);
+    bail(`${TEMPLATE}: the mr:tasks region has no checklist rows`);
   }
 
   const selected = required(await multiselect({
@@ -136,7 +157,7 @@ export async function runMr({dryRun = false}: MrOptions = {}): Promise<void> {
 
   const notDone = done.filter(isDone => !isDone).length;
   let explanation = '';
-  if (notDone > 0) {
+  if (notDone > 0 && hasSlot(template, 'explanation')) {
     explanation = await askMultiline(`${notDone} row(s) not marked Done — why?`, 'optional');
   }
 
