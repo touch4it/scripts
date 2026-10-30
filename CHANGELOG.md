@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-30
+
+### Changed
+
+- `mr` sets the pushed branch as the upstream of the local branch
+
 ## [0.3.0] - 2026-10-26
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "@touch4it/scripts",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Repository scripts. `mr` creates a GitLab merge request from the repository's MR template, over git push options — no API token required.",
   "type": "module",
   "bin": {
