@@ -68,7 +68,7 @@ export function firstCommitSubject(target: string): string {
 /** Streams push output through to the terminal while capturing it for inspection. */
 export async function push({options, branch}: {options: string[]; branch: string}): Promise<PushResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn('git', ['push', ...options, 'origin', `HEAD:refs/heads/${branch}`], {
+    const child = spawn('git', ['push', '--set-upstream', ...options, 'origin', `HEAD:refs/heads/${branch}`], {
       stdio: ['inherit', 'pipe', 'pipe'],
     });
     let output = '';
