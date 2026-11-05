@@ -1,7 +1,8 @@
 # @touch4it/scripts
 
 Repository scripts. One command: `mr` — opens a GitLab merge request from your repo's own MR
-template, over git push options. No API token, no editor setup.
+template, over git push options. No API token, no editor setup. When the GitLab CLI `glab` is
+logged in, `mr` uses it for member and milestone lists and creates the MR through it.
 
 ## Setup
 
@@ -21,9 +22,9 @@ npm run mr -- --dry-run    # fill it all in and print the push options, push not
 `npx` resolves the latest published version on every run. To pin one, add
 `@touch4it/scripts` to `devDependencies` and drop the `npx` prefix.
 
-**Run it instead of your first `git push` on the branch, not after.** GitLab only applies push
-options when the push moves a ref, so a branch that is already pushed and unchanged has nothing
-to trigger them. `mr` refuses in that case and hands you a UI link.
+**Without glab, run it instead of your first `git push` on the branch, not after.** GitLab only
+applies push options when the push moves a ref, so a branch that is already pushed and unchanged
+has nothing to trigger them. `mr` refuses in that case and hands you a UI link.
 
 ## Your template drives it
 
@@ -62,7 +63,8 @@ If any task does not apply, explain why.
 A template with a missing or broken region stops the run with an error that names the problem.
 
 - `/target_branch` is the default answer to the target branch prompt, and `master` is used when the
-  template has none. The prompt accepts only a branch that exists on `origin` and is behind yours.
+  template has none. The prompt lists the branches on `origin` and accepts only one that is behind
+  yours.
 - `/assign` and `/milestone` become push options. An action the template omits is not sent.
 - `/reviewer`, `/assign_reviewer` and `/request_review` stay in the body — GitLab has no reviewer
   push option. Best-effort: if the line shows up as literal text, set the reviewer in the UI.
@@ -77,7 +79,34 @@ the MR as a draft.
 
 GitLab drops a bad username or milestone without an error and `git push` still exits 0, so a
 clean run is not proof the MR is right. `mr` fails the run if the server sends back `WARNINGS`,
-but it cannot confirm the MR exists — only an API token could.
+but it cannot confirm the MR exists — only an API token could. That token is what glab adds.
+
+## With glab
+
+`mr` checks whether `glab` is logged in to the host of your `origin`. When it is, the assignee
+and reviewer prompts become searchable lists of project members, the milestone prompt lists the
+open milestones of the project and its groups, and the MR is created with `glab mr create` after
+a plain push. The reviewer is then set for real, a branch that is already pushed works, and
+GitLab rejecting a value fails the run instead of passing quietly.
+
+Log in once per host:
+
+```bash
+glab auth login --hostname gitlab.touch4it.com
+```
+
+Or skip the login and keep a token in the `.env` file at the repository root. `mr` passes these two
+variables from it to glab, and a variable already set in your shell wins over the file:
+
+```bash
+GITLAB_TOKEN=glpat-...
+GITLAB_HOST=gitlab.touch4it.com
+```
+
+`GITLAB_HOST` must be the host of your `origin`, because glab uses the token only for that host.
+
+Without glab, everything above still works the same. A glab that is installed but not logged in
+to that host gets a one-line hint at the start of the run.
 
 ## Development
 

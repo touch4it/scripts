@@ -55,6 +55,12 @@ export function revision(ref: string): string | undefined {
   return tryGit(['rev-parse', ref]);
 }
 
+export function originBranches(): string[] {
+  return git(['for-each-ref', '--format=%(refname:lstrip=3)', 'refs/remotes/origin'])
+    .split('\n')
+    .filter(name => name && name !== 'HEAD');
+}
+
 export function commitsAhead(target: string): number {
   return Number(git(['rev-list', '--count', `origin/${target}..HEAD`]));
 }

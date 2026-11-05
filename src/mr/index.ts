@@ -12,18 +12,17 @@ import {
   firstCommitSubject,
   hasRef,
   isDirty,
+  originBranches,
   originUrl,
-  push,
   repoRoot,
-  revision,
 } from '../lib/git.ts';
 import {
-  ask, askMultiline, askText, bail, BACK, required, runSteps, stepAnswer, type Step,
+  askMultiline, askOrPick, askText, bail, BACK, pick, required, runSteps, stepAnswer, type Step,
 } from '../lib/prompts.ts';
-import {newMergeRequestUrl, parseRemote, type Remote} from '../lib/remote.ts';
+import {parseRemote, type Remote} from '../lib/remote.ts';
+import {connectBackend, type Choices} from './backends.ts';
 import {
   assembleBody,
-  encodeDescription,
   hasSlot,
   parseTasks,
   parseTemplate,
@@ -55,6 +54,7 @@ type Context = {
   branch: string;
   template: Template;
   tasks: string[];
+  choices: Choices;
 };
 
 function readTemplate(text: string): Template {
@@ -94,13 +94,14 @@ function bodyOf({template}: Context, draft: Draft): string {
 }
 
 function draftSteps(context: Context): Array<Step<Draft>> {
-  const {branch, template, tasks} = context;
+  const {branch, template, tasks, choices} = context;
   const toField = <Key extends keyof Draft>(key: Key) => (value: Draft[Key] | typeof BACK): Partial<Draft> | typeof BACK =>
     value === BACK ? BACK : {[key]: value};
+  const branches = originBranches().filter(name => name !== branch).map(value => ({value}));
 
   return [
     {
-      ask: async draft => toField('target')(await askText('Target branch', draft.target, targetProblem)),
+      ask: async draft => toField('target')(await pick('Target branch', branches, draft.target, targetProblem)),
     },
     {
       ask: async draft => toField('title')(await askText(
@@ -116,9 +117,9 @@ function draftSteps(context: Context): Array<Step<Draft>> {
         validate: requireText('Description'),
       })),
     },
-    {ask: async draft => toField('assignee')(await ask('Assignee', draft.assignee))},
-    {ask: async draft => toField('reviewer')(await ask('Reviewer', draft.reviewer))},
-    {ask: async draft => toField('milestone')(await ask('Milestone', draft.milestone))},
+    {ask: async draft => toField('assignee')(await askOrPick('Assignee', draft.assignee, choices.members))},
+    {ask: async draft => toField('reviewer')(await askOrPick('Reviewer', draft.reviewer, choices.members))},
+    {ask: async draft => toField('milestone')(await askOrPick('Milestone', draft.milestone, choices.milestones))},
     {
       async ask(draft) {
         const selected = await stepAnswer(multiselect({
@@ -159,32 +160,6 @@ function draftSteps(context: Context): Array<Step<Draft>> {
   ];
 }
 
-function pushOptions(draft: Draft, body: string): string[] {
-  const options = [
-    '-o',
-    'merge_request.create',
-    '-o',
-    `merge_request.target=${draft.target}`,
-    '-o',
-    `merge_request.title=${draft.title}`,
-    '-o',
-    `merge_request.description=${encodeDescription(body)}`,
-  ];
-  if (draft.assignee) {
-    options.push('-o', `merge_request.assign=${draft.assignee}`);
-  }
-
-  if (draft.milestone) {
-    options.push('-o', `merge_request.milestone=${draft.milestone}`);
-  }
-
-  if (/^(WIP|Draft): /.test(draft.title)) {
-    options.push('-o', 'merge_request.draft');
-  }
-
-  return options;
-}
-
 function checkBranch(): {branch: string; remote: Remote} {
   const branch = currentBranch();
   if (!branch) {
@@ -206,16 +181,6 @@ function checkBranch(): {branch: string; remote: Remote} {
   }
 
   return {branch, remote};
-}
-
-function checkPushMovesRef(branch: string, remote: Remote): void {
-  const remoteHead = hasRef(`refs/remotes/origin/${branch}`) ? revision(`refs/remotes/origin/${branch}`) : undefined;
-  if (remoteHead && remoteHead === revision('HEAD')) {
-    bail(`'${branch}' is already pushed and unchanged, so this push would move no ref.\n`
-      + 'GitLab only applies push options on a ref update — no MR would be created.\n'
-      + `Add a commit, or open it in the UI:\n  ${
-        newMergeRequestUrl({...remote, branch})}`);
-  }
 }
 
 export async function runMr({dryRun = false}: MrOptions = {}): Promise<void> {
@@ -261,11 +226,13 @@ export async function runMr({dryRun = false}: MrOptions = {}): Promise<void> {
     log.warn('fetch failed — falling back to possibly stale refs');
   }
 
-  checkPushMovesRef(branch, remote);
+  const backend = await connectBackend(remote, branch);
 
   log.info('Esc goes back to the previous step, Ctrl-C aborts.');
 
-  const context = {branch, template, tasks};
+  const context = {
+    branch, template, tasks, choices: backend.choices,
+  };
   const draft = await runSteps(draftSteps(context), {
     target: templateValue(text, 'target_branch') || 'master',
     title: '',
@@ -277,22 +244,15 @@ export async function runMr({dryRun = false}: MrOptions = {}): Promise<void> {
     explanation: '',
   });
 
-  const options = pushOptions(draft, bodyOf(context, draft));
+  await backend.create({
+    branch,
+    target: draft.target,
+    title: draft.title,
+    body: bodyOf(context, draft),
+    assignee: draft.assignee,
+    reviewer: draft.reviewer,
+    milestone: draft.milestone,
+  }, dryRun);
 
-  if (dryRun) {
-    process.stdout.write(`DRY RUN — would push:\n${options.map(option => `  ${option}`).join('\n')}\n`);
-    outro('dry run — nothing pushed');
-    return;
-  }
-
-  const {code, output} = await push({options, branch});
-  if (code !== 0) {
-    bail('push failed');
-  }
-
-  if (output.includes('WARNINGS')) {
-    bail('GitLab reported push-option warnings above — the merge request may not have been created');
-  }
-
-  outro('merge request created');
+  outro(dryRun ? 'dry run — nothing pushed' : 'merge request created');
 }

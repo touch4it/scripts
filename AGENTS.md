@@ -30,8 +30,8 @@ Tests use `node:test` with `node:assert/strict`.
 
 `src/bin.ts` routes an argv command through a `COMMANDS` map. A new command is a directory under `src/` plus an entry in that map.
 
-- `src/lib/` — git calls (`git.ts`), origin-URL parsing and the UI-fallback link (`remote.ts`), and `@clack/prompts` helpers (`prompts.ts`) shared across commands.
-- `src/mr/` — the `mr` command: `index.ts` is the interactive flow and git-state guards, `template.ts` the pure template parsing and body assembly. Tests concentrate on the pure modules, `template.ts` and `remote.ts`.
+- `src/lib/` — git calls (`git.ts`), the `glab` adapter (`glab.ts`), origin-URL parsing and the UI-fallback link (`remote.ts`), `@clack/prompts` helpers and the step runner with Esc-back (`prompts.ts`), and the multiline prompt with word and line editing keys (`editor.ts`), shared across commands.
+- `src/mr/` — the `mr` command: `index.ts` is the interactive flow and git-state guards, `backends.ts` creates the MR through git push options or `glab`, `template.ts` the pure template parsing and body assembly. Tests concentrate on the pure functions.
 
 One non-obvious `mr` behavior: GitLab silently drops a bad username or milestone and `git push` still exits 0, so a clean run does not prove the MR is right. `mr` only fails on a `WARNINGS` response and cannot confirm the MR exists.
 

@@ -7,6 +7,9 @@
 - `mr` asks for the target branch, with the template's `/target_branch` as the default
 - Esc in `mr` goes back to the previous prompt and keeps the answers given so far
 - Word and line editing keys in the description and explanation, such as Option with an arrow and Ctrl-K
+- `mr` uses `glab` when it is logged in to the origin host: members and milestones as searchable lists, and the MR created with `glab mr create`
+- `GITLAB_TOKEN` and `GITLAB_HOST` from the repository's `.env` reach `glab`, so a token there replaces `glab auth login`
+- The target branch prompt lists the branches on `origin`
 
 ### Changed
 

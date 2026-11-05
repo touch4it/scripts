@@ -1,7 +1,7 @@
 import process from 'node:process';
 
 import {
-  cancel, isCancel, text, type CANCEL_SYMBOL,
+  autocomplete, cancel, isCancel, text, type CANCEL_SYMBOL,
 } from '@clack/prompts';
 
 import {editText} from './editor.ts';
@@ -11,6 +11,8 @@ export type Back = typeof BACK;
 
 type Answer<T> = T | typeof CANCEL_SYMBOL;
 type Validate = (value: string) => string | undefined;
+
+export type Choice = {value: string; label?: string; hint?: string};
 
 export type Step<Draft> = {
   when?: (draft: Draft) => boolean;
@@ -91,6 +93,39 @@ export async function ask(message: string, defaultValue: string): Promise<string
 
   const value = answer.trim();
   return value === '-' ? '' : value.replace(/^@/, '');
+}
+
+/** Searchable list: typing filters the choices. */
+export async function pick(message: string, choices: Choice[], initialValue: string, validate?: Validate): Promise<string | Back> {
+  const listed = choices.some(choice => choice.value === initialValue);
+  return stepAnswer(autocomplete({
+    message,
+    options: choices,
+    initialValue: listed ? initialValue : undefined,
+    placeholder: 'Type to filter',
+    maxItems: 8,
+    validate(value) {
+      if (value === undefined) {
+        return 'Nothing matches the filter';
+      }
+
+      return validate?.(String(value));
+    },
+  }));
+}
+
+/** A searchable list with a "none" entry when choices are known, the free-text prompt of `ask` otherwise. */
+export async function askOrPick(message: string, defaultValue: string, choices: Choice[] | undefined): Promise<string | Back> {
+  if (!choices) {
+    return ask(message, defaultValue);
+  }
+
+  const listed = choices.some(choice => choice.value === defaultValue);
+  return pick(message, [
+    {value: '', label: 'none'},
+    ...(defaultValue && !listed ? [{value: defaultValue, hint: 'not in the list'}] : []),
+    ...choices,
+  ], defaultValue);
 }
 
 export async function askText(message: string, defaultValue: string, validate?: Validate): Promise<string | Back> {
