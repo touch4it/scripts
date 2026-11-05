@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-05
+
 ### Added
 
 - `mr` asks for the target branch, with the template's `/target_branch` as the default
