@@ -47,7 +47,8 @@ export type GlabStatus
 /** Glab only counts as available when it can authenticate against this exact host. */
 export async function connectGlab(host: string, envFile: string): Promise<GlabStatus> {
   const env = glabEnv(existsSync(envFile) ? readFileSync(envFile, 'utf8') : undefined, process.env);
-  const auth = await runGlab(['auth', 'status', '--hostname', host], env);
+  // The auth status command ignores GITLAB_TOKEN, an API call honours both it and a saved login
+  const auth = await runGlab(['api', '--hostname', host, 'user'], env);
   if ('failure' in auth) {
     return auth.failure === 'missing' ? {kind: 'missing'} : {kind: 'logged-out', host};
   }

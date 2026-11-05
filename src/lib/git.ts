@@ -39,7 +39,7 @@ export function fetchOrigin(): boolean {
   try {
     execFileSync('git', ['fetch', '--quiet', 'origin'], {
       stdio: ['ignore', 'ignore', 'pipe'],
-      env: {...process.env, GIT_SSH_COMMAND: 'ssh -o ConnectTimeout=8 -o BatchMode=yes'},
+      env: {...process.env, GIT_SSH_COMMAND: 'ssh -o ConnectTimeout=8'},
     });
     return true;
   } catch {

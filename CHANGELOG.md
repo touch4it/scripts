@@ -14,6 +14,7 @@
 ### Changed
 
 - `mr` asks again on an empty title or description instead of stopping
+- The fetch at the start of `mr` asks for the SSH key passphrase when the agent has none cached, instead of failing
 - Updated `@clack/prompts`, `@types/node` and `eslint`
 
 ## [0.3.1] - 2026-10-30
