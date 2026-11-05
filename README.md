@@ -61,14 +61,18 @@ If any task does not apply, explain why.
 
 A template with a missing or broken region stops the run with an error that names the problem.
 
-- `/target_branch`, `/assign` and `/milestone` become push options. An action the template omits
-  is simply not sent.
+- `/target_branch` is the default answer to the target branch prompt, and `master` is used when the
+  template has none. The prompt accepts only a branch that exists on `origin` and is behind yours.
+- `/assign` and `/milestone` become push options. An action the template omits is not sent.
 - `/reviewer`, `/assign_reviewer` and `/request_review` stay in the body — GitLab has no reviewer
   push option. Best-effort: if the line shows up as literal text, set the reviewer in the UI.
 - `/milestone` must match a milestone title exactly.
 
-At any prompt, Enter keeps the default and `-` clears it. The description and the explanation
-take multiple lines; Tab focuses `[ submit ]`. A title that starts with `WIP:` or `Draft:` opens
+At any prompt, Enter keeps the default and `-` clears it. Esc goes back one prompt with your
+earlier answer filled in, so Enter walks forward again without retyping, and Ctrl-C quits. The description and the explanation
+take multiple lines; Tab focuses `[ submit ]`. In them, Option with an arrow moves by word, Ctrl-A
+and Ctrl-E (or Home and End) jump to the start and end of the line, Option+Backspace deletes a
+word, and Ctrl-U and Ctrl-K delete to the start and end of the line. A title that starts with `WIP:` or `Draft:` opens
 the MR as a draft.
 
 GitLab drops a bad username or milestone without an error and `git push` still exits 0, so a

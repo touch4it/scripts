@@ -33,11 +33,12 @@
     }
   },
   "dependencies": {
-    "@clack/prompts": "^1.7.0"
+    "@clack/core": "^1.5.1",
+    "@clack/prompts": "^1.8.1"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
-    "eslint": "^10.7.0",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.14.0",
     "eslint-config-touch4it": "^21.0.0",
     "typescript": "^7.0.2"
   }

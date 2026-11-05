@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- `mr` asks for the target branch, with the template's `/target_branch` as the default
+- Esc in `mr` goes back to the previous prompt and keeps the answers given so far
+- Word and line editing keys in the description and explanation, such as Option with an arrow and Ctrl-K
+
+### Changed
+
+- `mr` asks again on an empty title or description instead of stopping
+- Updated `@clack/prompts`, `@types/node` and `eslint`
+
 ## [0.3.1] - 2026-10-30
 
 ### Changed

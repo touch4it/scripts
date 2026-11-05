@@ -1,16 +1,29 @@
 import process from 'node:process';
 
 import {
-  cancel, isCancel, multiline, text,
+  cancel, isCancel, text, type CANCEL_SYMBOL,
 } from '@clack/prompts';
+
+import {editText} from './editor.ts';
+
+export const BACK = Symbol('back');
+export type Back = typeof BACK;
+
+type Answer<T> = T | typeof CANCEL_SYMBOL;
+type Validate = (value: string) => string | undefined;
+
+export type Step<Draft> = {
+  when?: (draft: Draft) => boolean;
+  ask: (draft: Draft) => Promise<Partial<Draft> | Back>;
+};
 
 export function bail(message: string): never {
   cancel(message);
   process.exit(1);
 }
 
-/** Unwraps a clack answer, aborting on Ctrl-C. */
-export function required<T>(value: T | symbol): T {
+/** Unwraps a clack answer, aborting on Ctrl-C or Esc. */
+export function required<T>(value: Answer<T>): T {
   if (isCancel(value)) {
     bail('Aborted.');
   }
@@ -18,24 +31,87 @@ export function required<T>(value: T | symbol): T {
   return value;
 }
 
+/** Unwraps a clack answer: Esc steps back, Ctrl-C aborts. */
+export async function stepAnswer<T>(prompt: Promise<Answer<T>>): Promise<T | Back> {
+  let escaped = false;
+  const onKeypress = (_: unknown, key?: {name?: string}): void => {
+    escaped = key?.name === 'escape';
+  };
+
+  process.stdin.on('keypress', onKeypress);
+  try {
+    const value = await prompt;
+    return isCancel(value) && escaped ? BACK : required(value);
+  } finally {
+    process.stdin.off('keypress', onKeypress);
+  }
+}
+
+/** Runs the steps in order, skipping a step whose `when` is false. Esc returns to the previous step that ran. */
+export async function runSteps<Draft>(steps: Array<Step<Draft>>, initial: Draft): Promise<Draft> {
+  let draft = initial;
+  const applies = (step: Step<Draft>): boolean => step.when?.(draft) ?? true;
+
+  for (let index = 0; index < steps.length;) {
+    const step = steps[index]!;
+    if (!applies(step)) {
+      index++;
+      continue;
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    const answer = await step.ask(draft);
+    if (answer === BACK) {
+      index = Math.max(0, steps.slice(0, index).findLastIndex(applies));
+      continue;
+    }
+
+    draft = {...draft, ...answer};
+    index++;
+  }
+
+  return draft;
+}
+
+function orDefault(value: string | undefined, defaultValue: string): string {
+  const trimmed = value?.trim() ?? '';
+  return trimmed === '' ? defaultValue : trimmed;
+}
+
 /** Prompt carrying a default: Enter keeps it, "-" clears it, a leading @ is optional. */
-export async function ask(message: string, defaultValue: string): Promise<string> {
-  const answer = required(await text({
+export async function ask(message: string, defaultValue: string): Promise<string | Back> {
+  const answer = await stepAnswer(text({
     message: `${message} (- for none)`,
     placeholder: defaultValue || 'none',
     defaultValue,
   }));
-  const value = String(answer ?? '').trim();
+  if (answer === BACK) {
+    return BACK;
+  }
+
+  const value = answer.trim();
   return value === '-' ? '' : value.replace(/^@/, '');
 }
 
-export async function askText(message: string, defaultValue: string): Promise<string> {
-  const answer = required(await text({message, placeholder: defaultValue, defaultValue}));
-  return String(answer ?? '').trim();
+export async function askText(message: string, defaultValue: string, validate?: Validate): Promise<string | Back> {
+  const answer = await stepAnswer(text({
+    message,
+    placeholder: defaultValue,
+    defaultValue,
+    validate: validate && (value => validate(orDefault(value, defaultValue))),
+  }));
+  return answer === BACK ? BACK : answer.trim();
 }
 
-/** Multi-line free text. showSubmit is required: without it Enter twice submits, so a blank line is unreachable. */
-export async function askMultiline(message: string, placeholder?: string): Promise<string> {
-  const answer = required(await multiline({message, placeholder, showSubmit: true}));
-  return String(answer ?? '').trim();
+export async function askMultiline(
+  message: string,
+  {placeholder, initialValue, validate}: {placeholder?: string; initialValue?: string; validate?: Validate} = {},
+): Promise<string | Back> {
+  const answer = await stepAnswer(editText({
+    message,
+    placeholder,
+    initialValue,
+    validate: validate && (value => validate(orDefault(value, ''))),
+  }));
+  return answer === BACK ? BACK : answer.trim();
 }
